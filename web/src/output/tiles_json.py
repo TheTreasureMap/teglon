@@ -34,6 +34,7 @@ def tile_file_to_json(path):
         "generated_at": datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
                                 .strftime("%Y-%m-%dT%H:%M:%SZ"),
         "detector": settings.get("TELESCOPE"),
+        "band": settings.get("A_LAMBDA_BAND"),
         "prob_type": settings.get("PROB_TYPE"),
         "cum_prob": _clean(settings.get("CUM_PROB")),
         "cum_prob_cut": _clean(settings.get("CUM_PROB_CUT")),
