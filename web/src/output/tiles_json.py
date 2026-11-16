@@ -1,18 +1,17 @@
-"""Serve the tile files `teglon extract` writes as JSON."""
+"""Serve the tile files `teglon extract` writes as JSON (the shape gwtm's suggested-pointings view expects)."""
 
 import math
 import os
+from datetime import datetime, timezone
 
 import numpy as np
 from astropy.table import Table
 
 
-def tile_file_path(gw_id, detector_name, healpix_file, exclude_planned=False, prob_type="4D", cum_prob=0.9,
-                   healpix_dir="./web/events/{GWID}"):
-    """Path of the tile file `extract_tiles` writes for these settings (the defaults are what `tm-ingest` writes)."""
-    suffix = "_exclplanned" if exclude_planned else ""
-    return os.path.join(healpix_dir.replace("{GWID}", gw_id), "%s_%s_%s_%s_%s%s.txt"
-                        % (gw_id, detector_name, prob_type, cum_prob, healpix_file, suffix))
+def tile_file_path(gw_id, detector_name, healpix_file, exclude_planned=False):
+    """The tile file `extract` writes with its default settings (4D, 0.9), which is what `tm-ingest` runs."""
+    return "./web/events/%s/%s_%s_4D_0.9_%s%s.txt" % (gw_id, gw_id, detector_name, healpix_file,
+                                                     "_exclplanned" if exclude_planned else "")
 
 
 def _clean(value):
@@ -27,12 +26,30 @@ def _clean(value):
 
 
 def tile_file_to_json(path):
-    """A tile file as JSON: its header settings, the skymap header it records, and one row per suggested
-    pointing with the file's own column names, in the file's order."""
+    """A tile file's rows and run settings. Rows keep the file's order (ranked by probability); `prob` is the
+    file's `Prob` (the field's own probability) and `cum_prob` its `Percentile` (the running total)."""
     table = Table.read(path, format="ascii.ecsv")
+    settings = table.meta.get("comments", {})
     return {
-        "tile_file": os.path.basename(path),
-        "settings": {k: _clean(v) for k, v in table.meta.get("comments", {}).items()},
-        "skymap_header": {k: _clean(v) for k, v in table.meta.get("keywords", {}).items()},
-        "pointings": [{col: _clean(row[col]) for col in table.colnames} for row in table],
+        "generated_at": datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
+                                .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "detector": settings.get("TELESCOPE"),
+        "prob_type": settings.get("PROB_TYPE"),
+        "cum_prob": _clean(settings.get("CUM_PROB")),
+        "cum_prob_cut": _clean(settings.get("CUM_PROB_CUT")),
+        "exclude_observed": _clean(settings.get("EXCLUDE_OBSERVED")),
+        "exclude_planned": _clean(settings.get("EXCLUDE_PLANNED")),
+        "pointings": [
+            {
+                "field_name": _clean(row["Field_Name"]),
+                "ra": _clean(row["RA"]),
+                "dec": _clean(row["Dec"]),
+                "prob": _clean(row["Prob"]),
+                "cum_prob": _clean(row["Percentile"]),
+                "ebv": _clean(row["EBV"]),
+                "a_lambda": _clean(row["A_lambda"]),
+                "lum_dist": _clean(row["Lum_Dist"]),
+            }
+            for row in table
+        ],
     }

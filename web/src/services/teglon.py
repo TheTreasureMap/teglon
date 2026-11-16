@@ -2799,6 +2799,47 @@ class Teglon:
             _print("Update HealpixPixel NetProb execution time: %s" % (t2 - t1))
             _print("********* end DEBUG ***********\n")
 
+    def link_detector_to_map(self, healpix_map_id, detector_id):
+        """Link one detector's static tiles to an already-loaded map (the StaticTile_HealpixPixel rows load_map
+        builds for every gridded detector). A telescope added after a map was loaded gets tiles on it this way,
+        without reloading the map, which would delete the observations loaded against it. Does nothing if the
+        detector is already linked to the map. Returns the number of rows added."""
+        import tempfile
+
+        linked = query_db(["""SELECT 1 FROM StaticTile_HealpixPixel st_hp JOIN StaticTile st ON st.id = st_hp.StaticTile_id
+                              WHERE st.Detector_id = %d AND st_hp.HealpixMap_id = %d LIMIT 1;"""
+                           % (detector_id, healpix_map_id)])[0]
+        if linked:
+            return 0
+
+        map_nside = int(query_db(["SELECT RescaledNSIDE FROM HealpixMap WHERE id = %d;" % healpix_map_id])[0][0][0])
+        pixel_ids = {int(r[1]): int(r[0]) for r in query_db(
+            ["SELECT id, Pixel_Index FROM HealpixPixel WHERE HealpixMap_id = %d;" % healpix_map_id])[0]}
+        det = query_db(["SELECT id, Name, ST_AsText(Poly) FROM Detector WHERE id = %d;" % detector_id])[0][0]
+        detector = Detector(det[1], Detector.get_detector_vertices_from_teglon_db(det[2]), detector_id=int(det[0]))
+        tiles = [Tile(central_ra_deg=float(r[1]), central_dec_deg=float(r[2]), detector=detector, nside=map_nside,
+                      tile_id=int(r[0]), tile_mwe=float(r[3]))
+                 for r in query_db(["SELECT id, RA, _Dec, EBV FROM StaticTile WHERE Detector_id = %d;" % detector_id])[0]]
+        _print("Linking %d %s tiles to map %d..." % (len(tiles), detector.name, healpix_map_id))
+        with Pool() as pool:
+            tiles = pool.map(initialize_tile, tiles)
+
+        rows = [(t.id, pixel_ids[p], healpix_map_id) for t in tiles for p in t.enclosed_pixel_indices if p in pixel_ids]
+        if not rows:
+            return 0
+        with tempfile.NamedTemporaryFile("w", suffix="_tile_pixel_upload.csv", delete=False) as fh:
+            csv.writer(fh).writerows(rows)
+            upload_csv = fh.name
+        try:
+            success = bulk_upload("""LOAD DATA LOCAL INFILE '%s' INTO TABLE StaticTile_HealpixPixel
+                                     FIELDS TERMINATED BY ',' LINES TERMINATED BY '\\n'
+                                     (StaticTile_id, HealpixPixel_id, HealpixMap_id);""" % upload_csv)
+        finally:
+            os.remove(upload_csv)
+        if not success:
+            raise RuntimeError("Uploading %s's tile-pixel links for map %d failed." % (detector.name, healpix_map_id))
+        return len(rows)
+
     def add_detector(self, tm_detector_id, min_dec=-90, max_dec=90.0, detector_geometry=None,
                         detector_width=None, detector_height=None, detector_radius=None):
 

@@ -137,6 +137,23 @@ def latest_map(gw_id):
     return (int(rows[0][0]), rows[0][1]) if rows else (None, None)
 
 
+def _changed_marker(gw_id):
+    return os.path.join(REPO_ROOT, "web", "events", gw_id, "pointings_changed_at")
+
+
+def mark_pointings_changed(gw_id):
+    """Record that a sync just changed this event's pointings (the API compares tables against this time)."""
+    os.makedirs(os.path.dirname(_changed_marker(gw_id)), exist_ok=True)
+    open(_changed_marker(gw_id), "a").close()
+    os.utime(_changed_marker(gw_id))   # like `touch`: update the time even if the file already exists
+
+
+def pointings_changed_at(gw_id):
+    """When a sync last changed this event's pointings (Unix time), or None."""
+    path = _changed_marker(gw_id)
+    return os.path.getmtime(path) if os.path.exists(path) else None
+
+
 def teglon_detectors_by_tm_id():
     """{TM instrument id: (Detector.id, Detector.Name)} for detectors registered from Treasure Map."""
     return {int(r[0]): (int(r[1]), r[2])
@@ -316,8 +333,10 @@ def sync_pointings(grace_ids=None, lookback_days=30, status="completed", updated
                 logger.info("%s: removed %d planned pointing(s) now completed.", gw_id, superseded)
                 changed = True
 
-        if changed and updated is not None:
-            updated.add(gw_id)
+        if changed:
+            mark_pointings_changed(gw_id)
+            if updated is not None:
+                updated.add(gw_id)
 
     return 1 if failures else 0
 

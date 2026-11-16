@@ -188,6 +188,8 @@ class TestSyncPointings(unittest.TestCase):
                   mock.patch.object(g, "delete_rows", self.db.delete_rows),
                   mock.patch.object(g, "tm_get", tm_get),
                   mock.patch.object(g, "treasuremap_settings", lambda: ("tok", "https://tm.example/api/v1")),
+                  # Don't write change markers into the real event directories.
+                  mock.patch.object(g, "mark_pointings_changed", lambda gw_id: None),
                   mock.patch.dict(sys.modules, {"web.src.ingestion.load_observed_tiles": loader})):
             p.start()
             self.addCleanup(p.stop)
