@@ -74,8 +74,7 @@ services:
       container_name: teglon_worker_prod
       build: ./teglon_worker
       image: "ghcr.io/davecoulter/teglon_o4:latest"
-      user: nobody
-      command: celery -A web.project.tasks worker --loglevel=info
+      command: celery -A web.src.services.teglon_worker_tasks worker --loglevel=info
       volumes:
         - ${VOL_APP}:/app
         - ${VOL_DUSTMAPS}:/dustmaps
