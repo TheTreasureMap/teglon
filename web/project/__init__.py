@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, send_from_directory
 from flask import request
+import os
 from celery import Celery
 
 app = Flask(__name__)
@@ -34,6 +35,38 @@ def get_status(task_id):
 
 
 
+
+
+@app.route("/suggested_pointings")
+def suggested_pointings():
+    """Suggested pointings for one Treasure Map instrument: the tile file `tm-ingest` wrote for the event's latest
+    map, as JSON. Query parameters: graceid, instrument_id (required); exclude_planned (default false: the list
+    that skips completed pointings; true: the one that also skips other groups' planned pointings)."""
+    from web.src.output.tiles_json import tile_file_path, tile_file_to_json
+    from web.src.utilities.get_TM_pointings import SAFE_ID, latest_map
+    from web.src.utilities.Database_Helpers import query_db
+
+    graceid = request.args.get("graceid", "")
+    if not SAFE_ID.match(graceid):
+        return jsonify(error="graceid is required and must be alphanumeric"), 400
+    try:
+        tm_id = int(request.args["instrument_id"])
+    except (KeyError, ValueError):
+        return jsonify(error="instrument_id (int) is required"), 400
+    exclude_planned = request.args.get("exclude_planned", "false").lower() == "true"
+
+    detector = query_db(["SELECT Name FROM Detector WHERE TM_id = %d;" % tm_id])[0]
+    if not detector:
+        return jsonify(error="No Teglon telescope for Treasure Map instrument %d" % tm_id), 404
+    map_id, healpix_file = latest_map(graceid)
+    if map_id is None:
+        return jsonify(error="No map for %s is loaded in Teglon" % graceid), 404
+
+    path = tile_file_path(graceid, detector[0][0], healpix_file, exclude_planned=exclude_planned)
+    if not os.path.exists(path):
+        return jsonify(error="No suggested pointings yet for %s on %s" % (detector[0][0], graceid)), 404
+    return jsonify(graceid=graceid, instrument_id=tm_id, detector=detector[0][0], healpix_file=healpix_file,
+                   **tile_file_to_json(path))
 
 
 @app.route("/")
