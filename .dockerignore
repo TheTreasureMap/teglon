@@ -1,0 +1,14 @@
+.git
+**/__pycache__
+Settings.ini
+docker/.env
+CLAUDE.local.md
+docs
+*.pdf
+*.png
+web/events/*
+!web/events/README.md
+web/src/utilities/pickles/*
+web/src/utilities/galaxy_catalog_files/*.dat
+# Light-curve models for `teglon efficiency` only; the API and tm-ingest don't use them.
+web/models

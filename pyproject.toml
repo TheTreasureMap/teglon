@@ -37,6 +37,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The gwtm-facing API (web/project): `uvicorn web.project:app --workers 1`.
+api = [
+    "fastapi==0.115.6",
+    "uvicorn==0.32.1",
+    "billiard==4.1.0",   # teglon.py imports billiard.pool at module level
+]
 # Web/worker stack (Flask API + Celery). Only needed for the legacy HTTP/queue path.
 web = [
     "gunicorn==20.1.0",

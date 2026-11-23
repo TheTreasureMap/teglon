@@ -2843,20 +2843,15 @@ class Teglon:
     def add_detector(self, tm_detector_id, min_dec=-90, max_dec=90.0, detector_geometry=None,
                         detector_width=None, detector_height=None, detector_radius=None):
 
+        from web.src.utilities.get_TM_pointings import treasuremap_settings
+
         treasure_map_detectors = None
-        tm_api_token = None
-        tm_base_url = None
 
         # Sanity
         is_error = False
-        try:
-            tm_api_token = self.config.get('treasuremap', 'TM_API_TOKEN')
-            tm_base_url = self.config.get('treasuremap', 'TM_ENDPOINT')
-        except:
-            _print("Error! No Treasure Map keys (`TM_API_TOKEN`, `TM_ENDPOINT`) in the Settings.ini file!")
-            is_error = True
+        tm_api_token, tm_base_url = treasuremap_settings()
 
-        if not any(tm_api_token) or not any(tm_base_url):
+        if not tm_api_token or not tm_base_url:
             _print("Can't load TM detectors with API keys or API endpoints!")
             is_error = True
 

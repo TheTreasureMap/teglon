@@ -7,8 +7,10 @@ import os
 
 from web.src.output.tiles_json import tile_file_path
 from web.src.utilities.Database_Helpers import query_db
-from web.src.utilities.get_TM_pointings import (SKIP_TM_INSTRUMENT_IDS, latest_map, pointings_changed_at,
-                                                sync_pointings, tm_get, treasuremap_settings)
+from web.src.utilities.get_TM_pointings import (SKIP_TM_INSTRUMENT_IDS, TM_SOURCE_PLANNED, latest_map,
+                                                pointings_changed_at, sync_pointings, tm_get, treasuremap_settings)
+
+CONTOUR_COLORS = {50: "#e6194B", 90: "#f58231"}
 
 
 def detector_for_instrument(instrument_id):
@@ -61,3 +63,66 @@ def write_suggested_pointings(graceid, instrument_id, exclude_planned=False):
                               exclude_observed=True, exclude_planned=exclude_planned) == 1:
         raise RuntimeError("Extracting tiles for %s failed; see the Teglon log." % detector_name)
     return tile_file_path(graceid, detector_name, healpix_file, exclude_planned)
+
+
+def coverage_contours(prob, covered, levels=(50, 90)):
+    """[(level, polygons)] credible-region outlines of a RING-ordered probability map after zeroing the `covered`
+    pixel indices and renormalising. Each polygon is a list of [ra, dec] in degrees. Empty if all of the map is
+    covered."""
+    import numpy as np
+    from ligo.skymap.postprocess import contour, find_greedy_credible_levels
+
+    p = np.array(prob, dtype=float)
+    p[np.asarray(covered, dtype=int)] = 0.0
+    total = p.sum()
+    if total <= 0:
+        return []
+    credible = 100 * find_greedy_credible_levels(p / total)
+    paths = contour(credible, list(levels), nest=False, degrees=True, simplify=True)
+    return [(level, [[[float(ra), float(dec)] for ra, dec in poly] for poly in polys])
+            for level, polys in zip(levels, paths)]
+
+
+def contours_path(graceid, map_id, include_planned):
+    return "./web/events/%s/%s_contours_%d_%s.json" % (graceid, graceid, map_id,
+                                                       "pandc" if include_planned else "completed")
+
+
+def event_contours(graceid, include_planned=False):
+    """The event's 4D (galaxy-weighted) contours for its latest map with sky covered by Treasure Map pointings
+    removed: completed pointings only, or completed and planned. Returns the `/contours` body
+    ({"detection_overlays": [...]}, the shape gwtm's renormalize-skymap overlay uses). Cached next to the tile
+    tables until a sync changes the event's pointings. Raises LookupError if Teglon hasn't loaded the event."""
+    import json
+    from web.src.services.teglon_cli import reconstruct_reweighted_map
+
+    map_id, _ = latest_map(graceid)
+    if map_id is None:
+        raise LookupError("Teglon hasn't processed this event yet")
+    path = contours_path(graceid, map_id, include_planned)
+    if table_is_current(path, graceid):
+        with open(path) as fh:
+            return json.load(fh)
+
+    nside = int(query_db(["SELECT RescaledNSIDE FROM HealpixMap WHERE id = %d;" % map_id])[0][0][0])
+    rows = query_db(["SELECT hp.Pixel_Index, hpc.NetPixelProb FROM HealpixPixel hp "
+                     "JOIN HealpixPixel_Completeness hpc ON hpc.HealpixPixel_id = hp.id "
+                     "WHERE hp.HealpixMap_id = %d;" % map_id])[0]
+    prob = reconstruct_reweighted_map(rows, nside, prob_index=1, pixindex_index=0)
+    source_filter = "" if include_planned else \
+        "AND (ot.Source IS NULL OR ot.Source <> '%s')" % TM_SOURCE_PLANNED
+    covered = [int(r[0]) for r in query_db([
+        "SELECT DISTINCT hp.Pixel_Index FROM ObservedTile_HealpixPixel ot_hp "
+        "JOIN ObservedTile ot ON ot.id = ot_hp.ObservedTile_id "
+        "JOIN HealpixPixel hp ON hp.id = ot_hp.HealpixPixel_id "
+        "WHERE ot_hp.HealpixMap_id = %d %s;" % (map_id, source_filter)])[0]]
+
+    body = {"detection_overlays": [
+        {"name": "%d%%" % level, "color": CONTOUR_COLORS.get(level),
+         "contours": [{"polygon": polygon} for polygon in polygons]}
+        for level, polygons in coverage_contours(prob, covered)]}
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".tmp", "w") as fh:
+        json.dump(body, fh)
+    os.replace(path + ".tmp", path)
+    return body
