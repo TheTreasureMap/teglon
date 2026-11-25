@@ -357,7 +357,7 @@ class Teglon:
         HOUR_FORMAT = "hour"
         DEG_FORMAT = "deg"
 
-        healpix_map_select = "SELECT id, RescaledNSIDE FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
+        healpix_map_select = "SELECT id, RescaledNSIDE FROM HealpixMap WHERE GWID = %s and Filename = %s"
         healpix_map_id = -1
         healpix_map_nside = -1
 
@@ -383,7 +383,7 @@ class Teglon:
             if self.options.healpix_file != "":
                 try:
                     # Get Map ID
-                    map_result = query_db([healpix_map_select % (self.options.gw_id, self.options.healpix_file)])[0][0]
+                    map_result = query_db([healpix_map_select], params_list=[(self.options.gw_id, self.options.healpix_file)])[0][0]
                     healpix_map_id = map_result[0]
                     healpix_map_nside = map_result[1]
                 except Error as e:

@@ -54,6 +54,7 @@ from ligo.skymap import distance
 
 from web.src.utilities.HEALPix_Helpers import *
 from web.src.utilities.Database_Helpers import *
+from web.src.utilities.get_TM_pointings import treasuremap_settings
 
 from web.src.objects.Detector import *
 from web.src.objects.Tile import *
@@ -127,7 +128,7 @@ class Teglon:
                             Name, ST_AsText(Poly), Deg_width,
                             Deg_height, id, MinDec, MaxDec
                         FROM Detector
-                        WHERE Name='%s';
+                        WHERE Name=%s;
                     '''
         insert_static_tile = '''INSERT INTO StaticTile (Detector_id, FieldName, RA, _Dec, Coord, Poly, EBV, N128_SkyPixel_id) 
                     VALUES (%s, %s, %s, %s, ST_PointFromText(%s, 4326), ST_GEOMFROMTEXT(%s, 4326), %s, %s)'''
@@ -136,7 +137,7 @@ class Teglon:
         tiles = []
         for detector_name in detector_name_list:
             print("Building `%s` coordinate grid ..." % detector_name)
-            detector_result = query_db([select_detect % detector_name])[0][0]
+            detector_result = query_db([select_detect], params_list=[(detector_name,)])[0][0]
             detector_vertices = Detector.get_detector_vertices_from_teglon_db(detector_result[1])
             detector_id = int(detector_result[4])
             detector_min_dec = float(detector_result[5])
@@ -534,8 +535,7 @@ class Teglon:
                     return ra, dec
 
                 treasure_map_detectors = None
-                tm_api_token = config.get('treasuremap', 'TM_API_TOKEN')
-                tm_base_url = config.get('treasuremap', 'TM_ENDPOINT')
+                tm_api_token, tm_base_url = treasuremap_settings()
 
                 # Sanity - only proceed if these values are present
                 if not (tm_api_token == '' or tm_api_token is None or tm_base_url == '' or tm_base_url is None):
@@ -620,12 +620,11 @@ class Teglon:
                         tm_detector = Detector(name, inst_vert)
                         treasure_map_detectors[inst_id] = tm_detector
 
-                    insert_tm = '''INSERT INTO Detector (Name, Poly, Area, TM_id) VALUES 
-                                    ('%s', ST_GEOMFROMTEXT('%s', 4326), %s, %s);'''
-                    for inst_id, tm_detect in treasure_map_detectors.items():
-                        q = insert_tm % (
-                        tm_detect.name, tm_detect.query_polygon_string, tm_detect.area, inst_id)
-                        query_db([q], commit=True)
+                    insert_tm = "INSERT INTO Detector (Name, Poly, Area, TM_id) VALUES (%s, ST_GEOMFROMTEXT(%s, 4326), %s, %s)"
+                    tm_rows = [(d.name, d.query_polygon_string, d.area, inst_id)
+                               for inst_id, d in treasure_map_detectors.items()]
+                    if not insert_records(insert_tm, tm_rows):
+                        raise RuntimeError("Failed to insert Treasure Map detectors")
 
                     # HACK: DC - TM doesn't store declination limits natively, so I am inserting this here since it will
                     # be used to construct a static grid for Charlie...

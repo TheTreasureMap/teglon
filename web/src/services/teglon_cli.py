@@ -634,11 +634,12 @@ def cmd_delete_event(args):
     map_ids = []
     if not args.files_only:
         if args.healpix_file:
-            sel = ("SELECT id, Filename FROM HealpixMap WHERE GWID = '%s' AND Filename = '%s'"
-                   % (args.gw_id, args.healpix_file))
+            sel = "SELECT id, Filename FROM HealpixMap WHERE GWID = %s AND Filename = %s"
+            params = (args.gw_id, args.healpix_file)
         else:
-            sel = "SELECT id, Filename FROM HealpixMap WHERE GWID = '%s'" % args.gw_id
-        rows = query_db([sel])[0]
+            sel = "SELECT id, Filename FROM HealpixMap WHERE GWID = %s"
+            params = (args.gw_id,)
+        rows = query_db([sel], params_list=[params])[0]
         map_ids = [(int(r[0]), r[1]) for r in rows]
 
     directory = event_dir(args.gw_id, args.healpix_dir)
@@ -826,9 +827,8 @@ def cmd_trigger(args):
     from web.src.utilities.Database_Helpers import query_db
     import healpy as hp
 
-    sel_map = ("SELECT id, RescaledNSIDE FROM HealpixMap WHERE GWID = '%s' AND Filename = '%s'"
-               % (args.gw_id, args.healpix_file))
-    mrow = query_db([sel_map])[0][0]
+    sel_map = "SELECT id, RescaledNSIDE FROM HealpixMap WHERE GWID = %s AND Filename = %s"
+    mrow = query_db([sel_map], params_list=[(args.gw_id, args.healpix_file)])[0][0]
     map_id = int(mrow[0])
     nside = int(mrow[1])
 
@@ -883,13 +883,11 @@ def cmd_doctor(args):
 
     # 5. Treasure Map token validity (the type=1 instruments probe).
     try:
-        from configparser import RawConfigParser
         import requests
-        cfg = RawConfigParser()
-        cfg.read([os.environ.get("TEGLON_SETTINGS", ""),
-                  os.path.join(REPO_ROOT, "Settings.ini"), "Settings.ini"])
-        token = cfg.get("treasuremap", "TM_API_TOKEN")
-        endpoint = cfg.get("treasuremap", "TM_ENDPOINT").rstrip("/")
+        from web.src.utilities.get_TM_pointings import treasuremap_settings
+        token, endpoint = treasuremap_settings()
+        if not token:
+            raise ValueError("no TM_API_TOKEN env var or [treasuremap] in Settings.ini")
         resp = requests.get(endpoint + "/instruments",
                             params={"api_token": token, "type": 1}, timeout=20)
         if resp.status_code == 200 and isinstance(resp.json(), list):

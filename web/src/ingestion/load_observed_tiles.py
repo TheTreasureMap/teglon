@@ -182,8 +182,8 @@ def load_tables(gw_id, healpix_file, tile_dir, tables_by_detector_name):
         ebv = pickle.load(handle)
 
     # Get Map ID
-    healpix_map_select = "SELECT id, RescaledNSIDE FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
-    healpix_map_query = query_db([healpix_map_select % (gw_id, healpix_file)])[0]
+    healpix_map_select = "SELECT id, RescaledNSIDE FROM HealpixMap WHERE GWID = %s and Filename = %s"
+    healpix_map_query = query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0]
     if len(healpix_map_query) == 0:
         print("Map (%s, %s) is not loaded in Teglon. Exiting..." % (gw_id, healpix_file))
         return 1, inserted
@@ -226,16 +226,16 @@ def _load_detector_table(input_detector_name, input_table, tile_dir, healpix_map
                          map_pixel_dict, filter_lookup, N128_dict, ebv):
     """Insert one detector's tiles + their tile-pixel relation. Returns (rc, number of tiles inserted)."""
 
-    detector_select_by_name = "SELECT id, Name, Deg_width, Deg_height, Deg_radius, Area, MinDec, MaxDec, ST_AsText(Poly) FROM Detector WHERE Name='%s'"
+    detector_select = "SELECT id, Name, Deg_width, Deg_height, Deg_radius, Area, MinDec, MaxDec, ST_AsText(Poly) FROM Detector WHERE "
 
     duplicate_tile_data = []
     unknown_filter_data = []
     obs_tile_insert_data = {}
 
     if isinstance(input_detector_name, int):  # Detector.id (several TM instruments can share a Name)
-        detector_query = query_db([detector_select_by_name.replace("Name='%s'", "id=%d") % input_detector_name])[0]
+        detector_query = query_db([detector_select + "id = %s"], params_list=[(input_detector_name,)])[0]
     else:
-        detector_query = query_db([detector_select_by_name % input_detector_name])[0]
+        detector_query = query_db([detector_select + "Name = %s"], params_list=[(input_detector_name,)])[0]
     if len(detector_query) == 0:
         print("Detector `%s` not found in Teglon's Detector table. Use --detector_name to map the Treasure "
               "Map instrument to a Teglon detector. Skipping..." % input_detector_name)
@@ -277,8 +277,8 @@ def _load_detector_table(input_detector_name, input_table, tile_dir, healpix_map
         FROM ObservedTile
         WHERE
             Detector_id = %s AND
-            Source = '%s' AND
-            FieldName = '%s' AND
+            Source = %s AND
+            FieldName = %s AND
             HealpixMap_id = %s
     '''
 
@@ -312,10 +312,10 @@ def _load_detector_table(input_detector_name, input_table, tile_dir, healpix_map
         if source in (TM_SOURCE, TM_SOURCE_PLANNED) and re.match(r"^TM_\d+$", field_name):
             # Per Source, so a completed pointing isn't mistaken for its own planned copy.
             unique_key = (detector.id, source, field_name, healpix_map_id)
-            already_exists = query_db([select_existing_tm % unique_key])[0]
+            already_exists = query_db([select_existing_tm], params_list=[unique_key])[0]
         else:
             unique_key = (detector.id, mjd, filter_id, n128_id, healpix_map_id)
-            already_exists = query_db([select_existing % unique_key])[0]
+            already_exists = query_db([select_existing], params_list=[unique_key])[0]
         if len(already_exists) > 0 and already_exists[0][0] >= 1:
             print("\n *********** Duplicated in DB: *********** ")
             print(error_msg)

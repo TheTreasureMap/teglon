@@ -104,8 +104,8 @@ def is_loadable(pointing, band_names):
 
 
 # --- Teglon DB ---------------------------------------------------------------------------------------
-def _rows(sql):
-    res = query_db([sql])
+def _rows(sql, params=None):
+    res = query_db([sql], params_list=[params]) if params else query_db([sql])
     return res[0] if res else []
 
 
@@ -133,6 +133,8 @@ def events_to_process(grace_ids, lookback_days):
 
 def latest_map(gw_id):
     """(HealpixMap.id, Filename) of the most recently loaded map for an event, or (None, None)."""
+    if not SAFE_ID.match(gw_id):
+        raise ValueError("Unexpected GW id %r" % gw_id)
     rows = _rows("SELECT id, Filename FROM HealpixMap WHERE GWID = '%s' ORDER BY id DESC LIMIT 1;" % gw_id)
     return (int(rows[0][0]), rows[0][1]) if rows else (None, None)
 
@@ -199,10 +201,12 @@ def clear_planned(gw_id, healpix_file=None):
     """Remove an event's planned Treasure Map pointings (all of its maps, or just `healpix_file`)."""
     if not SAFE_ID.match(gw_id):
         raise ValueError("Unexpected GW id %r" % gw_id)
-    sql = "SELECT id FROM HealpixMap WHERE GWID = '%s'" % gw_id
+    sql = "SELECT id FROM HealpixMap WHERE GWID = %s"
+    params = (gw_id,)
     if healpix_file:
-        sql += " AND Filename = '%s'" % healpix_file.replace("'", "''")
-    map_ids = [int(r[0]) for r in _rows(sql + ";")]
+        sql += " AND Filename = %s"
+        params += (healpix_file,)
+    map_ids = [int(r[0]) for r in _rows(sql + ";", params)]
     n = delete_planned(map_ids)
     logger.info("%s: cleared %d planned pointing(s) across %d map(s).", gw_id, n, len(map_ids))
     return n
