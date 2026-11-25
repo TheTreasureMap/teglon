@@ -72,7 +72,10 @@ def bulk_upload(query):
 
     return success
 
-def query_db(query_list, commit=False, raise_on_error=False):
+def query_db(query_list, commit=False, raise_on_error=False, params_list=None):
+    """Run each query in `query_list`. `params_list`, if given, holds one parameter tuple per query
+    (or None for a query without parameters); pass values this way rather than formatting them into
+    the SQL. A query that has parameters must write any literal % as %%."""
 
     results = []
     db = None
@@ -86,7 +89,7 @@ def query_db(query_list, commit=False, raise_on_error=False):
         for qi, q in enumerate(query_list):
             current_q = qi + 1
             _dbg("Executing %s/%s" % (current_q, query_count))
-            cursor.execute(q)
+            cursor.execute(q, params_list[qi] if params_list else None)
 
             if commit:  # used for updates, etc
                 db.commit()

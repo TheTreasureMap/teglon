@@ -294,9 +294,9 @@ class Teglon:
             extract_all = False
 
         # region SQL Statements
-        healpix_map_select = "SELECT id FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
-        band_select = "SELECT id, Name, F99_Coefficient FROM Band WHERE `Name`='%s'"
-        detector_select_by_name = "SELECT id, Name, Deg_width, Deg_height, Deg_radius, Area, MinDec, MaxDec, ST_AsText(Poly) FROM Detector WHERE Name='%s'"
+        healpix_map_select = "SELECT id FROM HealpixMap WHERE GWID = %s and Filename = %s"
+        band_select = "SELECT id, Name, F99_Coefficient FROM Band WHERE `Name`=%s"
+        detector_select_by_name = "SELECT id, Name, Deg_width, Deg_height, Deg_radius, Area, MinDec, MaxDec, ST_AsText(Poly) FROM Detector WHERE Name=%s"
 
         composed_tile_query = '''
             WITH
@@ -478,7 +478,7 @@ class Teglon:
         '''
         # endregion
 
-        healpix_map_id = int(query_db([healpix_map_select % (gw_id, healpix_file)])[0][0][0])
+        healpix_map_id = int(query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0][0][0])
 
         # region Query Builder
         #
@@ -549,13 +549,13 @@ class Teglon:
             for detector_name in all_detector_names:
                 band_shortname = default_settings.get(detector_name, band)
 
-                detector_result = query_db([detector_select_by_name % detector_name])[0][0]
+                detector_result = query_db([detector_select_by_name], params_list=[(detector_name,)])[0][0]
                 detector_id = int(detector_result[0])
                 detector_min_dec = float(detector_result[6])
                 detector_max_dec = float(detector_result[7])
 
                 band_name = band_mapping[band_shortname]
-                band_result = query_db([band_select % band_name])[0][0]
+                band_result = query_db([band_select], params_list=[(band_name,)])[0][0]
                 band_F99 = float(band_result[2])
 
                 if detector_name != 'NICKEL':
@@ -582,7 +582,7 @@ class Teglon:
         else:
             # short flag -> Name; otherwise treat `tele` as an exact detector Name.
             detector_name = detector_mapping.get(tele, tele)
-            detector_lookup = query_db([detector_select_by_name % detector_name])[0]
+            detector_lookup = query_db([detector_select_by_name], params_list=[(detector_name,)])[0]
             if len(detector_lookup) == 0:
                 _print("Invalid telescope selection `%s`. Use a short flag (%s) or an exact detector Name."
                        % (tele, list(detector_mapping.keys())))
@@ -593,7 +593,7 @@ class Teglon:
             detector_max_dec = float(detector_result[7])
 
             band_name = band_mapping[band]
-            band_result = query_db([band_select % band_name])[0][0]
+            band_result = query_db([band_select], params_list=[(band_name,)])[0][0]
             band_F99 = float(band_result[2])
 
             if detector_name != 'NICKEL':
@@ -796,7 +796,7 @@ class Teglon:
 
     #     # Generate all plottable assets
     #     healpix_map_select = "SELECT id, RescaledNSIDE, t_0 FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
-    #     healpix_map_result = query_db([healpix_map_select % (gw_id, healpix_file)])[0][0]
+    #     healpix_map_result = query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0][0]
     #     healpix_map_id = int(healpix_map_result[0])
     #     healpix_map_event_time = Time(healpix_map_result[2], format="gps")
     #     healpix_map_nside = int(healpix_map_result[1])
@@ -898,7 +898,7 @@ class Teglon:
 
     #         plot_ax = plot_axes[detector_name]
 
-    #         detector_result = query_db([detector_select_by_name % detector_name])[0][0]
+    #         detector_result = query_db([detector_select_by_name], params_list=[(detector_name,)])[0][0]
     #         detector_id = int(detector_result[0])
     #         detector_name = detector_result[1]
     #         detector_poly = detector_result[8]
@@ -1096,8 +1096,8 @@ class Teglon:
             plot_axes[detector_mapping.get(tele, tele)] = ax
     
         # Generate all plottable assets
-        healpix_map_select = "SELECT id, RescaledNSIDE, t_0 FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
-        healpix_map_result = query_db([healpix_map_select % (gw_id, healpix_file)])[0][0]
+        healpix_map_select = "SELECT id, RescaledNSIDE, t_0 FROM HealpixMap WHERE GWID = %s and Filename = %s"
+        healpix_map_result = query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0][0]
         healpix_map_id = int(healpix_map_result[0])
         healpix_map_event_time = Time(healpix_map_result[2], format="gps")
         healpix_map_nside = int(healpix_map_result[1])
@@ -1249,13 +1249,13 @@ class Teglon:
                 MaxDec,
                 ST_AsText(Poly)
             FROM Detector 
-            WHERE Name='%s'
+            WHERE Name=%s
         '''
         for detector_name, tile_file in tile_files.items():
     
             plot_ax = plot_axes[detector_name]
     
-            detector_lookup = query_db([detector_select_by_name % detector_name])[0]
+            detector_lookup = query_db([detector_select_by_name], params_list=[(detector_name,)])[0]
             if len(detector_lookup) == 0:
                 _print("Skipping unknown telescope `%s` (not found in the Detector table)." % detector_name)
                 continue
@@ -1384,7 +1384,7 @@ class Teglon:
         build_completeness_func = False
         build_galaxy_weights = True
 
-        healpix_map_select = "SELECT id, NSIDE FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
+        healpix_map_select = "SELECT id, NSIDE FROM HealpixMap WHERE GWID = %s and Filename = %s"
 
         is_error = False
 
@@ -1409,7 +1409,7 @@ class Teglon:
             is_error = True
             _print("You must specify which healpix file to process.")
 
-        map_check = query_db([healpix_map_select % (gw_id, healpix_file)])[0]
+        map_check = query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0]
         if len(map_check) > 0:
 
             current_map_id = map_check[0][0]
@@ -1514,7 +1514,7 @@ class Teglon:
                 map_nside = orig_map_nside
 
             _print("Getting map id")
-            healpix_map_id = query_db([healpix_map_select % (gw_id, healpix_file)])[0][0][0]
+            healpix_map_id = query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0][0][0]
             _print("Done map id")
         else:
             _print("Building map...")
@@ -1762,7 +1762,7 @@ class Teglon:
 
             _print("\nInserting %s Healpix Map: %s ..." % (gw_id, healpix_file))
             insert_records(healpix_map_insert, healpix_map_data)
-            healpix_map_id = query_db([healpix_map_select % (gw_id, healpix_file)])[0][0][0]
+            healpix_map_id = query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0][0][0]
             _print("...Done")
 
         if not build_pixels:
@@ -1806,8 +1806,8 @@ class Teglon:
             # and finally they are written to the working directory as a CSV that is bulk uploaded to the db. Clean up the file
             # afterward.
 
-            healpix_map_select = "SELECT id FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
-            healpix_map_id = query_db([healpix_map_select % (gw_id, healpix_file)])[0][0][0]
+            healpix_map_select = "SELECT id FROM HealpixMap WHERE GWID = %s and Filename = %s"
+            healpix_map_id = query_db([healpix_map_select], params_list=[(gw_id, healpix_file)])[0][0][0]
 
             # Associate these healpix pixels with our N128 Sky Pixels
             t1 = time.time()
@@ -2888,10 +2888,11 @@ class Teglon:
                     SELECT id, LOWER(`Name`), TM_id
                     FROM Detector
                     WHERE
-                        LOWER(`Name`) = '%s' OR
-                        LOWER(`Name`)='%s';
+                        LOWER(`Name`) = %s OR
+                        LOWER(`Name`) = %s;
                 '''
-        existing_detector_result = query_db([detector_select % (instrument_full_name, instrument_nickname)])[0]
+        existing_detector_result = query_db([detector_select], params_list=[(
+            instrument_full_name.lower(), (instrument_nickname or "").lower())])[0]
         if any(existing_detector_result):
             existing_id, existing_name, existing_tm_id = existing_detector_result[0]
             if existing_tm_id is None:
@@ -2934,24 +2935,21 @@ class Teglon:
 
         if is_detector_rectangular:
             insert_tm = '''INSERT INTO Detector (Name, Poly, Area, TM_id, MinDec, MaxDec, Deg_width, Deg_height) VALUES 
-                                                                ('%s', ST_GEOMFROMTEXT('%s', 4326), %s, %s, %s, %s, %s, %s);'''
-            q = insert_tm % (
+                                                                (%s, ST_GEOMFROMTEXT(%s, 4326), %s, %s, %s, %s, %s, %s);'''
+            query_db([insert_tm], commit=True, raise_on_error=True, params_list=[(
                 tm_detector.name, tm_detector.query_polygon_string, tm_detector.area, tm_detector_id, min_dec, max_dec,
-                tm_detector.deg_width, tm_detector.deg_height)
-            query_db([q], commit=True)
+                tm_detector.deg_width, tm_detector.deg_height)])
         elif is_detector_circular:
             insert_tm = '''INSERT INTO Detector (Name, Poly, Area, TM_id, MinDec, MaxDec, Deg_radius) VALUES 
-                                                                ('%s', ST_GEOMFROMTEXT('%s', 4326), %s, %s, %s, %s, %s);'''
-            q = insert_tm % (
+                                                                (%s, ST_GEOMFROMTEXT(%s, 4326), %s, %s, %s, %s, %s);'''
+            query_db([insert_tm], commit=True, raise_on_error=True, params_list=[(
                 tm_detector.name, tm_detector.query_polygon_string, tm_detector.area, tm_detector_id, min_dec, max_dec,
-                tm_detector.deg_radius)
-            query_db([q], commit=True)
+                tm_detector.deg_radius)])
         else:
             insert_tm = '''INSERT INTO Detector (Name, Poly, Area, TM_id, MinDec, MaxDec) VALUES 
-                                                                ('%s', ST_GEOMFROMTEXT('%s', 4326), %s, %s, %s, %s);'''
-            q = insert_tm % (
-                tm_detector.name, tm_detector.query_polygon_string, tm_detector.area, tm_detector_id, min_dec, max_dec)
-            query_db([q], commit=True)
+                                                                (%s, ST_GEOMFROMTEXT(%s, 4326), %s, %s, %s, %s);'''
+            query_db([insert_tm], commit=True, raise_on_error=True, params_list=[(
+                tm_detector.name, tm_detector.query_polygon_string, tm_detector.area, tm_detector_id, min_dec, max_dec)])
 
         _print("Detector `%s` added!" % tm_detector.name)
 
@@ -2959,9 +2957,9 @@ class Teglon:
 
         # Check if band exists - if so, reject
         select_band = '''
-            SELECT COUNT(*) FROM Band WHERE LOWER(`Name`)='%s'  
+            SELECT COUNT(*) FROM Band WHERE LOWER(`Name`) = %s
         '''
-        band_exists = query_db([select_band % band_name])[0]
+        band_exists = query_db([select_band], params_list=[(band_name.lower(),)])[0]
         if len(band_exists) > 0 and band_exists[0][0] >= 1:
             _print("\n *********** Duplicated Band in DB! `%s`*********** " % band_name)
             _print("Exiting...")
@@ -2987,9 +2985,9 @@ class Teglon:
                     Deg_height, id, MinDec, MaxDec
                 FROM Detector
                 WHERE 
-                    id = '%s'
+                    id = %s
                 '''
-        detector_result = query_db([detector_select % (teglon_detector_id)])[0][0]
+        detector_result = query_db([detector_select], params_list=[(int(teglon_detector_id),)])[0][0]
         detector_name = detector_result[0]
 
         static_grid_nside = 128

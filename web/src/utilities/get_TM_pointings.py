@@ -133,6 +133,8 @@ def events_to_process(grace_ids, lookback_days):
 
 def latest_map(gw_id):
     """(HealpixMap.id, Filename) of the most recently loaded map for an event, or (None, None)."""
+    if not SAFE_ID.match(gw_id):
+        raise ValueError("Unexpected GW id %r" % gw_id)
     rows = _rows("SELECT id, Filename FROM HealpixMap WHERE GWID = '%s' ORDER BY id DESC LIMIT 1;" % gw_id)
     return (int(rows[0][0]), rows[0][1]) if rows else (None, None)
 

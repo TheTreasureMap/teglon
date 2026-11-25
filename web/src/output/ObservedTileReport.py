@@ -138,13 +138,13 @@ class Teglon:
             return 1
 
         # Get Map ID
-        healpix_map_select = "SELECT id FROM HealpixMap WHERE GWID = '%s' and Filename = '%s'"
-        healpix_map_id = int(query_db([healpix_map_select % (self.options.gw_id, self.options.healpix_file)])[0][0][0])
+        healpix_map_select = "SELECT id FROM HealpixMap WHERE GWID = %s and Filename = %s"
+        healpix_map_id = int(query_db([healpix_map_select], params_list=[(self.options.gw_id, self.options.healpix_file)])[0][0][0])
 
         # Get all conposed observed tiles for this map
         observed_tile_select = '''
             SELECT 
-                ot.FileName,
+                ot.Source,
                 ot.id as ObservedTile_id, 
                 ot.FieldName, 
                 ot.RA, 
@@ -169,7 +169,7 @@ class Teglon:
             JOIN HealpixPixel_Completeness hpc on hpc.HealpixPixel_id = hp.id 
             WHERE ot.HealpixMap_id = %s 
             GROUP BY 
-                ot.FileName,
+                ot.Source,
                 ot.id, 
                 ot.FieldName, 
                 ot.RA, 
