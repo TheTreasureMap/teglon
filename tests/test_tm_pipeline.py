@@ -124,7 +124,7 @@ class FakeTeglonDB:
         self.next_id = 1
         self.link_deletes = []
 
-    def query_db(self, qs, commit=False, raise_on_error=False):
+    def query_db(self, qs, commit=False, raise_on_error=False, params_list=None):
         q = qs[0]
         if "FROM Detector WHERE TM_id IS NOT NULL" in q:
             return [list(self.DETECTORS)]
@@ -276,6 +276,14 @@ class TestSyncPointings(unittest.TestCase):
     def test_clear_planned_rejects_unsafe_gw_id(self):
         with self.assertRaises(ValueError):
             g.clear_planned("S1' OR '1'='1")
+
+    def test_clear_planned_passes_filename_as_parameter(self):
+        odd = "bay'star\\.fits"
+        with mock.patch.object(g, "query_db", return_value=[[]]) as q:
+            g.clear_planned("S250206dm", odd)
+        sql, params = q.call_args.args[0][0], q.call_args.kwargs["params_list"][0]
+        self.assertNotIn(odd, sql)
+        self.assertEqual(params, ("S250206dm", odd))
 
 
 # --- GetTreasureMapData -----------------------------------------------------------------------------

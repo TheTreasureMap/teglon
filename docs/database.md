@@ -50,3 +50,12 @@ fill the science data (galaxies, dust, detectors, static grids), run
 
 If you mount an already-populated `DATABASE/` volume, none of that is needed and
 you can go straight to [`teglon run <GWID>`](quickstart.md).
+
+A database first built from the old `teglon_O4.sql` schema has `ObservedTile.FileName`
+instead of `Source`, and pointing sync and tile extraction fail on it with
+`Unknown column 'Source'`. Upgrade it in place, once:
+
+```bash
+docker compose --env-file docker/.env -f docker/docker-compose.yml exec -T gw_db \
+  sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"' < docker/db_init/migrations/teglon_O4_to_20231116.sql
+```

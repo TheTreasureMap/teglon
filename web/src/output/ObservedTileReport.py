@@ -144,7 +144,7 @@ class Teglon:
         # Get all conposed observed tiles for this map
         observed_tile_select = '''
             SELECT 
-                ot.Source,
+                ot.FileName,
                 ot.id as ObservedTile_id, 
                 ot.FieldName, 
                 ot.RA, 
@@ -169,7 +169,7 @@ class Teglon:
             JOIN HealpixPixel_Completeness hpc on hpc.HealpixPixel_id = hp.id 
             WHERE ot.HealpixMap_id = %s 
             GROUP BY 
-                ot.Source,
+                ot.FileName,
                 ot.id, 
                 ot.FieldName, 
                 ot.RA, 
